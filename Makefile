@@ -1,13 +1,16 @@
 #=======================================#
-#																			  #
-#                Flow: 									#
-#   circt-verilog => | .mlir | 					#
-#     =>  circt-opt => | .mlir |				#
-#       =>  arcilator => |  .ll  |			#
-#         =>        llc => |  .s   |		#
-#           =>        gcc => |  .o   | 	#
+#																				#
+#								Flow: 									#
+#		circt-verilog => | .mlir | 					#
+#			=>	circt-opt => | .mlir |				#
+#				=>	arcilator => |  .ll  |			#
+#					=>				llc => |  .s   |		#
+#						=>				gcc => |  .o   | 	#
 #																			  #
 #=======================================#
+
+include circt/make_build/Makefile 
+include slang/make_build/Makefile
 
 CIRCT_VRG ?= 	$(shell which circt-verilog)
 CIRCT_OPT ?= 	$(shell which circt-opt)
@@ -26,6 +29,7 @@ BUILD_DIR	=		$(RISC_V_DIR)/build
 asm-to-bin: $(BUILD_DIR)/%.s 
 	$(CC) -o $(basename $<).o $< 
 
+# --filetype=obj <-- сразу в объекты 
 ll-to-asm: $(BUILD_DIR)/%.ll 
 	$(LLC) $(LLC_FLAGS) -o $(basename $<).s $< 
 
@@ -47,16 +51,31 @@ test-asm-to-bin: $(BUILD_DIR)/$(TEST_MOD).s
 
 test-ll-to-asm: $(BUILD_DIR)/$(TEST_MOD).ll 
 	$(LLC) $(LLC_FLAGS) $< > $(BUILD_DIR)/$(TEST_MOD).s 
+	@echo "#---------ASM----------#"
+	cat $(BUILD_DIR)/$(TEST_MOD).s
+	@echo "#-----------------------#"
 
 test-mlirs-to-ll: $(BUILD_DIR)/$(TEST_MOD).mlir 
 	$(ARCILATOR) $< > $(BUILD_DIR)/$(TEST_MOD).ll 
+	@echo "#--------LLVM IR--------#"
+	cat $(BUILD_DIR)/$(TEST_MOD).ll
+	@echo "#-----------------------#"
 
 test-mlirs-opt: $(BUILD_DIR)/$(TEST_MOD).mlir
 	mv $(BUILD_DIR)/$(TEST_MOD).mlir $(BUILD_DIR)/$(TEST_MOD)_pre.mlir 
 	$(CIRCT_OPT) $(BUILD_DIR)/$(TEST_MOD)_pre.mlir > $(BUILD_DIR)/$(TEST_MOD).mlir 
+	@echo "#-----Optimized Mlir----#"
+	cat $(BUILD_DIR)/$(TEST_MOD).mlir
+	@echo "#-----------------------#"
 
 test-sv-to-mlirs: $(RISC_V_DIR)/core/$(TEST_MOD).sv 
-	$(CIRCT_VRG) $< > $(BUILD_DIR)/$(TEST_MOD).mlir 
+	@echo "#----SystemVerilog -----#"
+	cat $(RISC_V_DIR)/core/$(TEST_MOD).sv 
+	@echo "------------------------#"
+	$(CIRCT_VRG) $< > $(BUILD_DIR)/$(TEST_MOD).mlir
+	@echo "#---------MLIR---------#"
+	cat $(BUILD_DIR)/$(TEST_MOD).mlir
+	@echo "#-----------------------#"
 
 #===-------------------------------------
 # Convenience 
