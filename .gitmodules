@@ -1,9 +1,11 @@
 [submodule "slang"]
 	path = slang
-	url = git@github.com:GREEN-ITMO-YADRO/slang.git
+	url = ../slang.git
+
 [submodule "circt"]
 	path = circt
-	url = git@github.com:GREEN-ITMO-YADRO/circt.git
+	url = ../circt.git
+
 [submodule "risc-v"]
 	path = risc-v
-	url = git@github.com:GREEN-ITMO-YADRO/risc-v.git
+	url = ../risc-v.git
