@@ -1,88 +1,74 @@
-#=======================================#
-#																				#
-#								Flow: 									#
-#		circt-verilog => | .mlir | 					#
-#			=>	circt-opt => | .mlir |				#
-#				=>	arcilator => |  .ll  |			#
-#					=>				llc => |  .s   |		#
-#						=>				gcc => |  .o   | 	#
-#																			  #
-#=======================================#
+CIRCT_VERILOG_FLAGS ?=
+CIRCT_OPT_FLAGS ?=
 
-include circt/make_build/Makefile 
-include slang/make_build/Makefile
+BUILD_DIR = build
+MENACE_DIR = risc-v
+CIRCT_DIR = circt
 
-CIRCT_VRG ?= 	$(shell which circt-verilog)
-CIRCT_OPT ?= 	$(shell which circt-opt)
-ARCILATOR ?= 	$(shell which arcilator)
-LLC   		?=	$(shell which llc-14)
-LLC_FLAGS =		-opaque-pointers 
-CC 				?=	$(shell which gcc)
-RISC_V_DIR=		risc-v
-OBJS			=		$(wildcard $(RISC_V_DIR)/core/*.sv)
-BUILD_DIR	=		$(RISC_V_DIR)/build
+CIRCT_BUILD_DIR = $(CIRCT_DIR)/build
+CIRCT_BIN_DIR = $(CIRCT_BUILD_DIR)/bin
 
-#===-------------------------------------
-# Default flow  
-#===-------------------------------------
+CIRCT_VERILOG ?= $(CIRCT_BIN_DIR)/circt-verilog
+CIRCT_OPT ?= $(CIRCT_BIN_DIR)/circt-opt
 
-asm-to-bin: $(BUILD_DIR)/%.s 
-	$(CC) -o $(basename $<).o $< 
+CIRCT_OPT_PASSES ?= \
+	--llhd-early-code-motion \
+	--llhd-temporal-code-motion \
+	--llhd-process-lowering \
+	--llhd-desequentialize \
+	--llhd-sig2reg \
+	--canonicalize
 
-# --filetype=obj <-- сразу в объекты 
-ll-to-asm: $(BUILD_DIR)/%.ll 
-	$(LLC) $(LLC_FLAGS) -o $(basename $<).s $< 
+EXPECTED_FAIL_FILES = \
+	$(MENACE_DIR)/core/mmu.sv \
+	$(MENACE_DIR)/core/rom.sv \
 
-mlirs-to-ll: $(BUILD_DIR)/%_op.mlir
-	$(ARCILATOR) -o $(basename $<).ll $< 
+ALL_SV_FILES = $(shell find $(MENACE_DIR) -name '*.sv')
+CORE_FILES = $(wildcard $(MENACE_DIR)/core/*.sv)
+NON_FAILING_FILES = $(filter-out $(EXPECTED_FAIL_FILES),$(CORE_FILES))
 
-mlirs-opt: $(BUILD_DIR)/%.mlir 
-	$(CIRCT_OPT) -o $(basename $<)_opt.mlir $< 
+SEARCH_PATHS = $(MENACE_DIR)/core $(MENACE_DIR)/sim
 
-sv-to-mlirs: $(OBJS)
-	$(CIRCT_VRG) $(OBJS)
+.PHONY: all-mlir
 
-#===-------------------------------------
-# Test flow on single file
-#===-------------------------------------
+# this prevents Make from removing intermediate files
+# (such as %-hw.mlir when building %.mlir)
+.NOTINTERMEDIATE:
 
-test-asm-to-bin: $(BUILD_DIR)/$(TEST_MOD).s 
-	$(CC) -o $(TEST_MOD).o $^ 
+all-mlir: $(NON_FAILING_FILES:$(MENACE_DIR)/%.sv=$(BUILD_DIR)/%.mlir)
 
-test-ll-to-asm: $(BUILD_DIR)/$(TEST_MOD).ll 
-	$(LLC) $(LLC_FLAGS) $< > $(BUILD_DIR)/$(TEST_MOD).s 
-	@echo "#---------ASM----------#"
-	cat $(BUILD_DIR)/$(TEST_MOD).s
-	@echo "#-----------------------#"
+$(BUILD_DIR)/%-moore.mlir: $(MENACE_DIR)/%.sv $(BUILD_DIR)/%.dep $(CIRCT_VERILOG)
+	$(CIRCT_VERILOG) $(SEARCH_PATHS:%=-y %) $(CIRCT_VERILOG_FLAGS) --ir-moore -o $@ $<
 
-test-mlirs-to-ll: $(BUILD_DIR)/$(TEST_MOD).mlir 
-	$(ARCILATOR) $< > $(BUILD_DIR)/$(TEST_MOD).ll 
-	@echo "#--------LLVM IR--------#"
-	cat $(BUILD_DIR)/$(TEST_MOD).ll
-	@echo "#-----------------------#"
+$(BUILD_DIR)/%-hw.mlir: $(BUILD_DIR)/%-moore.mlir $(CIRCT_VERILOG)
+	$(CIRCT_VERILOG) $(CIRCT_VERILOG_FLAGS) --format mlir --ir-hw -o $@ $<
 
-test-mlirs-opt: $(BUILD_DIR)/$(TEST_MOD).mlir
-	mv $(BUILD_DIR)/$(TEST_MOD).mlir $(BUILD_DIR)/$(TEST_MOD)_pre.mlir 
-	$(CIRCT_OPT) $(BUILD_DIR)/$(TEST_MOD)_pre.mlir > $(BUILD_DIR)/$(TEST_MOD).mlir 
-	@echo "#-----Optimized Mlir----#"
-	cat $(BUILD_DIR)/$(TEST_MOD).mlir
-	@echo "#-----------------------#"
+$(BUILD_DIR)/%.mlir: $(BUILD_DIR)/%-hw.mlir $(CIRCT_OPT)
+	$(CIRCT_OPT) $(CIRCT_OPT_FLAGS) $(CIRCT_OPT_PASSES) -o $@ $<
 
-test-sv-to-mlirs: $(RISC_V_DIR)/core/$(TEST_MOD).sv 
-	@echo "#----SystemVerilog -----#"
-	cat $(RISC_V_DIR)/core/$(TEST_MOD).sv 
-	@echo "------------------------#"
-	$(CIRCT_VRG) $< > $(BUILD_DIR)/$(TEST_MOD).mlir
-	@echo "#---------MLIR---------#"
-	cat $(BUILD_DIR)/$(TEST_MOD).mlir
-	@echo "#-----------------------#"
+%/:
+	mkdir -p $@
 
-#===-------------------------------------
-# Convenience 
-#===-------------------------------------
+$(CIRCT_VERILOG) $(CIRCT_OPT):
+	$(error Could not find `$@`. Make sure to build CIRCT before running make)
 
-all: sv-to-mlirs mlirs-opt mlirs-to-ll ll-to-asm asm-to-bin
+# dependency tracking
+DEP_core__alu = core/enums.sv
+DEP_core__counter = core/register.sv
+DEP_core__cpu = core/datapath.sv core/cu.sv
+DEP_core__cu = core/enums.sv core/mux.sv
+DEP_core__datapath = core/counter.sv core/le_to_be.sv core/regfile.sv core/register.sv core/enums.sv core/alu.sv core/csr.sv core/adder.sv core/mux.sv
+DEP_core__led_mmap = core/register.sv
 
-single: test-sv-to-mlirs test-mlirs-opt test-mlirs-to-ll test-ll-to-asm test-asm-to-bin
+# (function) converts, e.g., core/cu to core__cu
+DEP_VAR_NAME = DEP_$(subst /,__,$(1))
+# (function) converts, e.g., core/cu.sv to $(BUILD_DIR)/core/cu.dep
+DEP_PATH = $(patsubst %.sv,$(BUILD_DIR)/%.dep,$(1))
 
-.PHONY: all 
+define DEP_TEMPLATE
+$$(BUILD_DIR)/$(1).dep: $$(MENACE_DIR)/$(1).sv $(call DEP_PATH,$(value $(call DEP_VAR_NAME,$(1)))) | $(dir $(BUILD_DIR)/$(1).dep)
+	@touch $$@
+
+endef
+
+$(foreach file,$(ALL_SV_FILES),$(eval $(call DEP_TEMPLATE,$(patsubst $(MENACE_DIR)/%.sv,%,$(file)))))
