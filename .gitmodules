@@ -1,7 +1,3 @@
-[submodule "slang"]
-	path = slang
-	url = ../slang.git
-
 [submodule "circt"]
 	path = circt
 	url = ../circt.git
