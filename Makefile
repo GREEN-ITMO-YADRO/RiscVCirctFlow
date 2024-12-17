@@ -56,7 +56,7 @@ $(BUILD_DIR)/test/%.mlir: $(TESTBENCH_DIR)/%.mlir
 	awk -f scripts/remove-outer-module.awk $^ > $@
 
 $(BUILD_DIR)/test/%.mlir-run: $(BUILD_DIR)/test/%.mlir $(ARCILATOR) build/.FORCE
-	$(ARCILATOR) $(ARCILATOR_FLAGS) --run $< | FileCheck $<
+	$(ARCILATOR) $(ARCILATOR_FLAGS) --run $< | FileCheck -v --dump-input always $<
 
 test: $(foreach file,$(TESTBENCHES),$(BUILD_DIR)/test/$(file).mlir-run)
 
