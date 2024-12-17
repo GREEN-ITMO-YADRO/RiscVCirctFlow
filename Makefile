@@ -69,7 +69,10 @@ $(CIRCT_VERILOG) $(CIRCT_OPT) $(ARCILATOR):
 	$(error Could not find `$@`. Make sure to build CIRCT before running make)
 
 # testbench dependencies
-$(BUILD_DIR)/test/alu.mlir: $(BUILD_DIR)/core/alu.mlir
+$(BUILD_DIR)/core/alu-patched.mlir: patches/alu.mlir.patch $(BUILD_DIR)/core/alu.mlir
+	patch -p1 -o $@ < $<
+
+$(BUILD_DIR)/test/alu.mlir: $(BUILD_DIR)/core/alu-patched.mlir
 
 # SV module dependency tracking
 DEP_core__alu = core/enums.sv

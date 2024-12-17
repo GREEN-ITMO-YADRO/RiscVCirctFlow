@@ -1,0 +1,25 @@
+--- a/build/core/alu.mlir	2024-12-17 19:39:51.837475302 +0300
++++ b/build/core/alu.mlir	2024-12-17 19:40:34.768320063 +0300
+@@ -17,9 +17,7 @@
+     %c2_i5 = hw.constant 2 : i5
+     %c1_i5 = hw.constant 1 : i5
+     %c0_i5 = hw.constant 0 : i5
+-    %out = llhd.sig %c0_i32 : i32
+-    %1 = llhd.prb %out : !hw.inout<i32>
+-    %2 = comb.extract %1 from 0 : (i32) -> i1
++    %2 = comb.extract %84 from 0 : (i32) -> i1
+     %3 = comb.icmp ceq %alu_op, %c0_i5 : i5
+     %4 = comb.icmp ceq %alu_op, %c1_i5 : i5
+     %5 = comb.icmp ceq %alu_op, %c2_i5 : i5
+@@ -102,10 +100,7 @@
+     %82 = comb.xor %33, %true : i1
+     %83 = comb.and %79, %82 : i1
+     %84 = comb.mux %83, %c0_i32, %81 : i32
+-    %85 = comb.or %83, %80, %76, %72, %68, %64, %60, %56, %52, %48, %44, %40, %3 : i1
+-    llhd.drv %out, %84 after %0 if %85 : !hw.inout<i32>
+-    %86 = llhd.prb %out : !hw.inout<i32>
+-    hw.output %86, %2 : i32, i1
++    hw.output %84, %2 : i32, i1
+   }
+ }
+ 
