@@ -73,6 +73,8 @@ $(BUILD_DIR)/core/alu-patched.mlir: patches/alu.mlir.patch $(BUILD_DIR)/core/alu
 	patch -p1 -o $@ < $<
 
 $(BUILD_DIR)/test/alu.mlir: $(BUILD_DIR)/core/alu-patched.mlir
+$(BUILD_DIR)/test/regfile.mlir: $(BUILD_DIR)/core/regfile.mlir
+$(BUILD_DIR)/test/regfile-rw.mlir: $(BUILD_DIR)/core/regfile.mlir
 
 # SV module dependency tracking
 DEP_core__alu = core/enums.sv
