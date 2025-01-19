@@ -4,8 +4,11 @@
   } else if (inside && $0 ~ /^}/) {
     inside = 0
   } else {
-    # strip the leading indent.
-    sub(/^  /, "")
+    if (inside) {
+      # strip the leading indent.
+      sub(/^  /, "")
+    }
+
     print
   }
 }
